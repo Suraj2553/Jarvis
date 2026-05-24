@@ -48,6 +48,7 @@ class TerminalInputThread:
         stt_engine=None,
         quit_fn: Optional[Callable[[], None]] = None,
         get_persona_fn: Optional[Callable[[], str]] = None,
+        set_persona_fn: Optional[Callable[[str], None]] = None,
     ):
         self._handle_text  = handle_text_fn
         self._loop         = loop
@@ -55,6 +56,7 @@ class TerminalInputThread:
         self._stt          = stt_engine
         self._quit_fn      = quit_fn
         self._get_persona  = get_persona_fn   # returns "jarvis" | "friday"
+        self._set_persona  = set_persona_fn   # callable(persona_str)
         self._stop_event   = threading.Event()
         self._thread: Optional[threading.Thread] = None
 
@@ -100,6 +102,14 @@ class TerminalInputThread:
         """Process slash commands. Returns True if handled."""
         lower = cmd.lower()
 
+        if lower in ("/friday", "/fr"):
+            self._switch_persona("friday")
+            return True
+
+        if lower in ("/jarvis", "/jv"):
+            self._switch_persona("jarvis")
+            return True
+
         if lower in ("/hindi", "/hi"):
             self._switch_language("hi")
             return True
@@ -124,6 +134,17 @@ class TerminalInputThread:
 
         print(f"[JARVIS] Unknown command: {cmd}", flush=True)
         return True
+
+    def _switch_persona(self, persona: str) -> None:
+        if self._set_persona is None:
+            print(f"[JARVIS] Persona switch not connected", flush=True)
+            return
+        try:
+            self._set_persona(persona)
+            label = "Friday" if persona == "friday" else "JARVIS"
+            print(f"[JARVIS] Persona switched to {label}", flush=True)
+        except Exception as e:
+            logger.error("[Terminal] Persona switch error: %s", e)
 
     def _switch_language(self, lang: str) -> None:
         if self._tts is None and self._stt is None:

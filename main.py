@@ -1109,6 +1109,22 @@ class JARVIS:
         except Exception as _e:
             print(f"[JARVIS] Persona toggle error: {_e}")
 
+    def _on_toggle_persona_by_name(self, persona: str) -> None:
+        """Switch to a named persona — called from terminal /friday or /jarvis."""
+        try:
+            if self._brain:
+                self._brain.set_persona(persona)
+            if self._tts_engine:
+                self._tts_engine.switch_persona(persona)
+                if persona == "jarvis":
+                    self._tts_engine.switch_language("en")
+            self._signals.set_persona_sig.emit(persona)
+            _msg = "Friday here, sir." if persona == "friday" else "JARVIS back online, sir."
+            if self._tts_engine:
+                threading.Thread(target=self._tts_engine.speak, args=(_msg,), daemon=True).start()
+        except Exception as _e:
+            print(f"[JARVIS] Persona switch error: {_e}")
+
     def _on_toggle_mute(self) -> None:
         """HUD mute zone clicked — pause or resume listening."""
         self._muted = not self._muted
@@ -1240,6 +1256,7 @@ class JARVIS:
                 stt_engine=self._stt_engine,
                 quit_fn=self._quit,
                 get_persona_fn=lambda: getattr(self._brain, "_persona", "jarvis") if self._brain else "jarvis",
+                set_persona_fn=self._on_toggle_persona_by_name,
             )
             self._terminal_thread.start()
             return
