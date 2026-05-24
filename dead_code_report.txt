@@ -1,0 +1,67 @@
+JARVIS Dead Code Audit Report
+Generated: 2026-05-22
+
+=== DEAD FILES ===
+audio/voice_engine.py
+  — Defines VoiceEngine (Coqui TTS). Never imported by any other file.
+    _HAS_COQUI is always False (Coqui TTS not installed).
+    All 302 lines are unreachable in normal execution.
+  ACTION: Delete entire file.
+
+download_map.py
+  — One-time utility to download a GeoJSON file. Not imported anywhere.
+    Not part of the running JARVIS system.
+  ACTION: Leave in place (not harmful, may be useful for maintainer).
+
+=== DEAD IMPORTS ===
+audio/voice_engine.py: from TTS.api import TTS as _CoquiTTS
+  (entire file is dead — see above)
+
+audio/noise_pipeline.py: import webrtcvad (in except block only)
+  — Falls back to webrtcvad if Silero VAD unavailable.
+    webrtcvad is installed but Silero is preferred and loaded.
+    webrtcvad imports are in fallback try/except — acceptable, not dead.
+  ACTION: Keep (legitimate fallback).
+
+=== DEAD FUNCTIONS ===
+audio/voice_engine.py: all methods
+  (entire file is dead — see above)
+
+brain/brain.py: NARRATION_PATTERNS["web_search"] line ~34
+  — Key "web_search" appears TWICE in the dict (lines 34 and 48).
+    The second definition silently overwrites the first.
+    The first ["Searching that.", "Cross-referencing sources.", "On it."] is dead.
+  ACTION: Remove duplicate key (keep second definition).
+
+=== ORPHANED CONFIG KEYS ===
+config.py: "vad_aggressiveness": 2
+  — Set but never read anywhere. noise_pipeline.py uses hardcoded Vad(2).
+    Only read by dead voice_engine.py.
+  ACTION: Remove from DEFAULTS.
+
+config.py: "media_mode_auto": True
+  — Set but never read by any code.
+  ACTION: Remove from DEFAULTS.
+
+config.py: "clap_threshold": 0.65
+  — Set but listener.py uses its own hardcoded constants (_CLAP_WINDOW_S, etc.).
+  ACTION: Remove from DEFAULTS.
+
+config.py: "media_clap_threshold": 0.85
+  — Set but listener.py uses hardcoded _MEDIA_CONFIDENCE = 0.85 instead.
+  ACTION: Remove from DEFAULTS.
+
+config.py: "tts_speaker": "p273"
+  — Coqui VITS speaker. Only read by dead voice_engine.py.
+  ACTION: Remove from DEFAULTS.
+
+=== DEAD REQUIREMENTS ===
+requirements.txt: TTS
+  — Coqui TTS. Only used by dead audio/voice_engine.py. ~2GB models.
+  ACTION: Remove from requirements.txt.
+
+=== SUMMARY ===
+Files deleted:    1 (audio/voice_engine.py)
+Keys removed:     5 (from config.py DEFAULTS)
+Duplicate fixed:  1 (brain/brain.py NARRATION_PATTERNS)
+Requirements:     1 removed (TTS/Coqui)

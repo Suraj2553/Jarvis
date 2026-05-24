@@ -1,0 +1,68 @@
+# ── Core ──────────────────────────────────────────────────────────── #
+python-dotenv        # loads .env into os.environ at startup
+sounddevice          # mic input / audio output
+numpy                # audio array math
+requests             # HTTP calls (weather, news, Sarvam API)
+tzlocal              # local timezone detection
+psutil               # system info, process list
+pywin32              # Windows APIs (volume, windows)
+comtypes             # COM interop (SAPI voice, pycaw)
+send2trash           # safe file deletion
+
+# ── Speech-to-text ────────────────────────────────────────────────── #
+faster-whisper       # local Whisper STT (base.en model, ~150 MB)
+
+# ── Text-to-speech ────────────────────────────────────────────────── #
+pyttsx3              # SAPI5 fallback TTS
+
+# ── LLM backends ──────────────────────────────────────────────────── #
+groq                 # Groq SDK (llama-3.3-70b, cloud, fast)
+# Ollama: run ollama.com installer separately — no pip package
+
+# ── Audio enhancement & VAD ───────────────────────────────────────── #
+rnnoise-wrapper      # RNNoise noise cancellation (requires MSVC build tools)
+noisereduce          # Fallback spectral noise reduction
+silero-vad           # Silero VAD — neural, handles Indian accents/Hinglish
+soundcard            # Loopback capture for echo cancellation
+keyboard             # PTT hotkey detection
+
+# ── Neural VAD (Silero) ───────────────────────────────────────────── #
+torch                # required by Silero VAD (CPU-only build is fine)
+torchaudio           # required by Silero VAD for audio ops
+
+# ── UI ────────────────────────────────────────────────────────────── #
+PyQt6                # HUD, boot sequence, conversation panel
+pystray              # System tray icon
+Pillow               # Image ops for tray icon
+
+# ── System automation ─────────────────────────────────────────────── #
+pyautogui            # Mouse/keyboard control
+pyperclip            # Clipboard read/write
+pycaw                # Windows audio session volume control
+pytesseract          # OCR for screen reading (requires Tesseract binary)
+pygetwindow          # Active window title detection
+
+# ── Web & search ──────────────────────────────────────────────────── #
+duckduckgo-search    # DDG search + news (used via subprocess for crash isolation)
+feedparser           # RSS feed parsing (Google News fallback)
+
+# ── Emotion & awareness ───────────────────────────────────────────── #
+librosa              # Audio feature extraction (pitch, RMS, centroid)
+scipy                # DSP helpers used by librosa
+opencv-python        # Face detection (used by FER)
+fer                  # Face Emotion Recognition
+
+# ── Notifications ─────────────────────────────────────────────────── #
+plyer                # Cross-platform desktop notifications
+
+# ── Agent & browser automation ────────────────────────────────────── #
+playwright           # Browser control — run: python -m playwright install chromium
+
+# ── Notes ─────────────────────────────────────────────────────────── #
+# sqlite3       — built into Python, no install needed
+# rnnoise-wrapper — may need: pip install rnnoise-wrapper (MSVC required on Windows)
+# silero-vad    — replaces webrtcvad-wheels; handles Indian accents better
+# torch/torchaudio — CPU-only install: pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+# pytesseract   — also needs Tesseract binary from github.com/UB-Mannheim/tesseract/wiki
+# playwright    — after pip install, run: python -m playwright install chromium
+# Sarvam API    — uses requests (already listed); set SARVAM_API_KEY in config

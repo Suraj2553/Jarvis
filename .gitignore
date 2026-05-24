@@ -1,0 +1,47 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+
+# JARVIS runtime files
+crash_trace.txt
+jarvis.log
+jarvis_err.log
+*.log
+
+# User config & data (contains API keys and personal data)
+# %APPDATA%/JARVIS/ is outside the repo — nothing to ignore here
+# But if anyone puts a local config.json, keep it out
+config.json
+
+# Environment variables (API keys — never commit)
+.env
+
+# Coqui TTS model cache (large, downloaded on first run)
+tts_models/
+
+# Playwright browser binaries
+playwright-browsers/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude Code internal
+.claude/
+
+# Windows
+Thumbs.db
+desktop.ini
