@@ -24,6 +24,14 @@ def _load_model() -> None:
     global _model, _utils, _load_failed
     if _load_failed or _model is not None:
         return
+    # COM must be initialised on every thread that imports torchaudio/comtypes.
+    # Without this, GC can release STA-bound COM proxies from the wrong apartment
+    # while torchaudio is loading → 0xC0000005 access violation.
+    try:
+        import pythoncom
+        pythoncom.CoInitializeEx(None, 0x0)  # COINIT_MULTITHREADED
+    except Exception:
+        pass
     try:
         _model, _utils = torch.hub.load(
             repo_or_dir='snakers4/silero-vad',

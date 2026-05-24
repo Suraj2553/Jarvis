@@ -42,10 +42,12 @@ class _SystemAudioGate:
 
     def _run(self) -> None:
         # COM must be initialised on every thread that touches WASAPI/soundcard.
-        # 0x800401F0 = CO_E_NOTINITIALIZED — this call prevents that error.
+        # Use COINIT_MULTITHREADED (0x0): soundcard's MediaFoundation COM objects
+        # are created in the same thread but STA (CoInitialize default) causes
+        # RPC_E_WRONG_THREAD (0x8001010d) when deviceperiod is called.
         try:
             import pythoncom
-            pythoncom.CoInitialize()
+            pythoncom.CoInitializeEx(None, 0x0)  # COINIT_MULTITHREADED
         except Exception:
             pass
 

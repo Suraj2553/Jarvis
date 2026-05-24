@@ -2286,7 +2286,7 @@ def _preload_native_extensions() -> None:
         "sounddevice", "soundfile", "soundcard",
         "PIL.Image", "PIL.ImageDraw", "PIL.GifImagePlugin",
         "cv2",
-        "numpy", "torch", "ctranslate2", "faster_whisper", "onnxruntime",
+        "numpy", "torch", "torchaudio", "ctranslate2", "faster_whisper", "onnxruntime",
         "comtypes", "comtypes.client", "comtypes.automation", "pycaw.pycaw",
         "psutil", "pyautogui", "pyperclip",
     ]
