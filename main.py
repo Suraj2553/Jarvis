@@ -20,6 +20,8 @@ Startup sequence
 
 import faulthandler
 import os
+import warnings
+warnings.filterwarnings("ignore", message="data discontinuity in recording")
 import random
 import subprocess
 import sys
@@ -63,7 +65,11 @@ class _SmartOut:
     def write(self, text: str) -> None:
         tname = threading.current_thread().name
         if tname in self._CONSOLE_THREADS:
-            _real_stdout.write(text)
+            try:
+                _real_stdout.write(text)
+            except UnicodeEncodeError:
+                enc = getattr(_real_stdout, "encoding", "utf-8") or "utf-8"
+                _real_stdout.write(text.encode(enc, errors="replace").decode(enc))
         else:
             _log_fh.write(text)
 
@@ -1296,6 +1302,11 @@ class JARVIS:
                 quit_fn=self._quit,
                 get_persona_fn=lambda: getattr(self._brain, "_persona", "jarvis") if self._brain else "jarvis",
                 set_persona_fn=self._on_toggle_persona_by_name,
+                quiet_fn=self._pause_background_services,
+                wake_fn=self._trigger_activation,
+                language_switch_fn=lambda lang: handle_language_switch(
+                    lang, self._tts_engine, self._stt_engine, brain=self._brain
+                ),
             )
             self._terminal_thread.start()
             return
@@ -1315,11 +1326,19 @@ class JARVIS:
                 self._activate(source="terminal", pre_text=text)
         threading.Thread(target=_loop, daemon=True, name="TerminalInput").start()
 
+    def _trigger_activation(self) -> None:
+        """Play activation sound and show HUD — used by /wake stdin command."""
+        self._signals.show_win.emit()
+        play_activation()
+
     def _on_terminal_text(self, text: str) -> None:
         """Dispatch text typed in the terminal to the JARVIS pipeline."""
         print(f"[You] {text}")
         if self._tts_engine and self._tts_engine.is_speaking():
             self._tts_engine.stop_immediately()
+        # Reset conv_state so can_activate() passes even if JARVIS was mid-turn.
+        # _activate() also bypasses _processing for terminal source.
+        self._conv_state.interrupted()
         self._activate(source="terminal", pre_text=text)
 
     def _start_vad_pipeline(self) -> None:
@@ -1455,10 +1474,11 @@ class JARVIS:
 
     def _activate(self, source: str, pre_text: str = "") -> None:
         self._cancel_interview_patience()
-        if source != "question_followup" and not self._conv_state.can_activate():
+        is_terminal = (source == "terminal")
+        if not is_terminal and source != "question_followup" and not self._conv_state.can_activate():
             return
         with self._lock:
-            if self._processing:
+            if self._processing and not is_terminal:
                 return
             now = time.monotonic()
             # Terminal and VAD bypass cooldown — VAD already filters with silence detection
@@ -1761,6 +1781,7 @@ class JARVIS:
                     _first_sentence_started = [False]
 
                     def _on_response(reply: str, q: str = _query) -> None:
+                        _heartbeat_done.set()   # cancel heartbeat — real response is here
                         _final_reply[0] = reply
                         self._signals.show_text.emit(q, reply)
                         self._push_war_room(q, reply)
@@ -1785,6 +1806,7 @@ class JARVIS:
                             self._speak(reply)
 
                     def _on_sentence(sentence: str) -> None:
+                        _heartbeat_done.set()   # cancel heartbeat — first sentence is streaming
                         _sentence_spoken.set()
                         self._set_status("speaking")
                         if self._current_lang() == 'hi':
@@ -2016,18 +2038,27 @@ class JARVIS:
         self._tray.start()
 
         # Clap listener (enhanced or legacy)
-        self._clap = ClapListener(self._on_clap, self._cfg)
-        self._clap.calibrate()
-        self._clap.start()
+        try:
+            self._clap = ClapListener(self._on_clap, self._cfg)
+            self._clap.calibrate()
+            self._clap.start()
+        except Exception as _clap_err:
+            print(f"[Main] Clap listener unavailable (audio device busy?): {_clap_err}")
+            self._clap = None
 
         # Wake word
         if self._cfg.get("wake_word_enabled", True):
-            self._wakeword = WakeWordListener(
-                callback=self._on_wake_word,
-                ambient_rms=self._clap.ambient_rms,
-                config=self._cfg,
-            )
-            self._wakeword.start()
+            try:
+                _ambient = self._clap.ambient_rms if self._clap else 0
+                self._wakeword = WakeWordListener(
+                    callback=self._on_wake_word,
+                    ambient_rms=_ambient,
+                    config=self._cfg,
+                )
+                self._wakeword.start()
+            except Exception as _ww_err:
+                print(f"[Main] Wake word listener unavailable: {_ww_err}")
+                self._wakeword = None
 
         # Terminal input fallback (type commands when mic is noisy)
         self._start_terminal_input()

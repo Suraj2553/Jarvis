@@ -71,6 +71,29 @@ def _wait_tts_done(min_pause: float = 0.5) -> None:
     time.sleep(0.5)
 
 
+def _speak_narration(text: str, slide_idx: int) -> None:
+    """Speak narration while printing a heartbeat every 1.5 s.
+
+    The heartbeat keeps automation's speech_idle counter below the 2.2 s
+    threshold so observe_turn doesn't exit mid-narration.
+    """
+    if not _speak_fn:
+        return
+    _stop_ticker = threading.Event()
+
+    def _ticker():
+        total = _session.get("total", "?")
+        while not _stop_ticker.wait(timeout=1.5):
+            print(f"[PresentAuto] Narrating slide {slide_idx + 1} of {total}...", flush=True)
+
+    t = threading.Thread(target=_ticker, daemon=True, name="PresentTicker")
+    t.start()
+    try:
+        _speak_fn(text)
+    finally:
+        _stop_ticker.set()
+
+
 def _focus_ppt_window() -> None:
     """Bring the PowerPoint slideshow to the foreground so key presses land on it."""
     try:
@@ -103,7 +126,10 @@ def _present_sequence(narration_0: str = "", skip_initial: bool = False) -> None
 
             # Narrate slide 0 directly — PPT is on slide 1, display matches narration
             if not _session.get("auto_stopped") and _speak_fn:
-                _speak_fn(narration_0)
+                _speak_narration(narration_0, 0)
+            # Signal automation that slide 1 is done so observe_turn can exit cleanly.
+            if not _session.get("auto_stopped"):
+                print("[PresentAuto] Slide 1 narration complete.", flush=True)
 
         # Auto-advance slides 1, 2, 3, …  (or resume from current when skip_initial)
         while not _session.get("auto_stopped"):
@@ -144,7 +170,7 @@ def _present_sequence(narration_0: str = "", skip_initial: bool = False) -> None
             # Double gate: also check slides — _session.clear() removes auto_stopped
             # so we can't rely on it alone after end_presentation() clears the dict.
             if _speak_fn and _session.get("slides") and not _session.get("auto_stopped"):
-                _speak_fn(narration)
+                _speak_narration(narration, _session["current"])
 
             if _session.get("auto_stopped") or not _session.get("slides"):
                 break

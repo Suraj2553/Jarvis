@@ -1,9 +1,9 @@
 """audio/tts_engine.py — Unified interrupt-safe TTS engine.
 
 English priority chain:
-  1. Chatterbox TTS  — voice cloning from WAV sample (free, local, ~400ms)
+  1. ElevenLabs      — cloud streaming, skipped after 401
   2. Kokoro-82M ONNX — built-in voices incl. bm_george British male (free, local, ~80ms)
-  3. ElevenLabs      — cloud streaming, skipped after 401
+  3. Chatterbox TTS  — voice cloning from WAV sample (free, local, slow on CPU)
   4. SAPI5           — always available on Windows (fallback)
 
 Hindi priority chain:
@@ -256,8 +256,8 @@ class TTSEngine:
         if self._language == "hi":
             self._speak_hindi(text)
         elif self._persona == "friday" and self._el_hindi_client is not None:
-            # Friday in English mode — use her multilingual voice (eleven_multilingual_v2)
-            self._speak_hindi(text)
+            # Friday in English mode — ElevenLabs multilingual gives her distinct voice
+            self._speak_friday_english(text)
         else:
             self._speak_english(text)
 
@@ -272,25 +272,7 @@ class TTSEngine:
 
     def _speak_english(self, text: str) -> None:
         self._ensure_local_tts()
-        # 1. Chatterbox (voice cloning — primary if loaded)
-        if self._chatterbox is not None and self._chatterbox.is_ready():
-            try:
-                self._chatterbox.reset()
-                self._chatterbox.speak(text)
-                return
-            except Exception as e:
-                logger.warning("[TTSEngine] Chatterbox error: %s — trying Kokoro", e)
-
-        # 2. Kokoro (fast built-in voices — secondary)
-        if self._kokoro is not None and self._kokoro.is_ready():
-            try:
-                self._kokoro.reset()
-                self._kokoro.speak(text)
-                return
-            except Exception as e:
-                logger.warning("[TTSEngine] Kokoro error: %s — trying ElevenLabs", e)
-
-        # 3. ElevenLabs (cloud, skipped after 401)
+        # 1. ElevenLabs (cloud streaming — fast, high quality)
         if self._el_client is not None and not self._el_auth_failed:
             try:
                 self._el_client.reset()
@@ -302,17 +284,51 @@ class TTSEngine:
                     self._el_auth_failed = True
                     logger.error(
                         "[TTSEngine] ElevenLabs 401 — key expired. "
-                        "Update elevenlabs_api_key in config.json. Using SAPI5 for this session."
+                        "Update elevenlabs_api_key in config.json. Using local TTS."
                     )
                 else:
-                    logger.warning("[TTSEngine] ElevenLabs error: %s — SAPI5 fallback", e)
+                    logger.warning("[TTSEngine] ElevenLabs error: %s — trying Kokoro", e)
+
+        # 2. Kokoro (fast local, ~80ms)
+        if self._kokoro is not None and self._kokoro.is_ready():
+            try:
+                self._kokoro.reset()
+                self._kokoro.speak(text)
+                return
+            except Exception as e:
+                logger.warning("[TTSEngine] Kokoro error: %s — trying Chatterbox", e)
+
+        # 3. Chatterbox (voice cloning — slow on CPU, last local resort)
+        if self._chatterbox is not None and self._chatterbox.is_ready():
+            try:
+                self._chatterbox.reset()
+                self._chatterbox.speak(text)
+                return
+            except Exception as e:
+                logger.warning("[TTSEngine] Chatterbox error: %s — SAPI5 fallback", e)
 
         # 4. SAPI5 PowerShell (always available)
         self._fallback_ps(text)
 
+    def _speak_friday_english(self, text: str) -> None:
+        """Friday's English voice: ElevenLabs multilingual (eleven_multilingual_v2) → SAPI5."""
+        if self._el_hindi_client is not None and not self._el_hindi_failed:
+            try:
+                self._el_hindi_client.reset()
+                self._el_hindi_client.speak(text)
+                return
+            except Exception as e:
+                err_str = str(e)
+                if "401" in err_str or "Unauthorized" in err_str:
+                    self._el_hindi_failed = True
+                    logger.error("[TTSEngine] ElevenLabs Friday 401 — falling back to SAPI5.")
+                else:
+                    logger.warning("[TTSEngine] ElevenLabs Friday error: %s — SAPI5 fallback", e)
+        self._fallback_ps(text)
+
     def _speak_hindi(self, text: str) -> None:
-        """Hindi TTS: ElevenLabs multilingual → Sarvam bulbul:v3 → SAPI5."""
-        # 1. ElevenLabs Hindi (sweet female voice, eleven_multilingual_v2)
+        """Hindi TTS: ElevenLabs multilingual (Friday's voice) → Sarvam bulbul:v3 → SAPI5."""
+        # 1. ElevenLabs multilingual — Friday's voice handles Hindi natively
         if self._el_hindi_client is not None and not self._el_hindi_failed:
             try:
                 self._el_hindi_client.reset()
@@ -326,7 +342,7 @@ class TTSEngine:
                 else:
                     logger.warning("[TTSEngine] ElevenLabs Hindi error: %s — trying Sarvam", e)
 
-        # 2. Sarvam bulbul:v3 (native Indian female voice)
+        # 2. Sarvam bulbul:v3 — natural Indian voice fallback
         if self._sarvam_tts is not None:
             try:
                 self._sarvam_tts.reset()

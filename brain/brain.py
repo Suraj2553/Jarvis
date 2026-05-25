@@ -780,6 +780,10 @@ def _build_system_prompt(
         "When using a tool: output exactly: {\"tool\": \"name\", \"args\": {...}}",
         "After tool result: summarize in 1-2 spoken sentences. No JSON in final response.",
         "For creative requests (poems, jokes, songs): respond directly without tools.",
+        "NEVER call goto_slide, present_file, next_slide, or any presentation tool unless "
+        "the user explicitly says 'slide', 'presentation', 'ppt', or 'present'.",
+        "Persona switches ('Switch to Friday', 'Hey Friday', etc.) are handled by the system — "
+        "do NOT call any tool for them; respond with plain confirmation text only.",
     ]
 
     return "\n".join(sections)
@@ -1190,6 +1194,12 @@ class Brain:
     #  Main entry point                                                    #
     # ------------------------------------------------------------------ #
 
+    _PERSONA_SWITCH_PHRASES = (
+        "switch to friday", "activate friday", "hey friday", "friday mode",
+        "switch to jarvis", "activate jarvis", "jarvis mode", "back to jarvis",
+        "enable friday", "wake friday", "wake jarvis",
+    )
+
     def process(
         self,
         user_text: str,
@@ -1197,6 +1207,13 @@ class Brain:
         on_sentence: Optional[Callable[[str], None]] = None,
     ) -> str:
         """Run one user utterance through the ReAct loop. Returns final reply."""
+        # Guard: persona switches are handled upstream by main.py's _pipeline.
+        # If one slips through (e.g. garbled transcription), return empty so the
+        # LLM never gets a chance to call goto_slide or similar wrong tools.
+        _tl = user_text.lower().strip(" .,!?")
+        if any(p in _tl for p in self._PERSONA_SWITCH_PHRASES):
+            return ""
+
         self._set_status("thinking")
 
         # Wrap on_sentence to suppress raw JSON tool calls from being spoken.

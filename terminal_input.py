@@ -29,11 +29,11 @@ from typing import Callable, Optional
 logger = logging.getLogger(__name__)
 
 _BANNER = (
-    "\n[JARVIS] Terminal input active — type your command and press Enter.\n"
-    "  /hindi   → switch to Hindi\n"
-    "  /english → switch to English\n"
-    "  /status  → show engine status\n"
-    "  /quit    → exit\n"
+    "\n[JARVIS] Terminal input active -- type your command and press Enter.\n"
+    "  /hindi   -> switch to Hindi\n"
+    "  /english -> switch to English\n"
+    "  /status  -> show engine status\n"
+    "  /quit    -> exit\n"
 )
 
 
@@ -49,15 +49,21 @@ class TerminalInputThread:
         quit_fn: Optional[Callable[[], None]] = None,
         get_persona_fn: Optional[Callable[[], str]] = None,
         set_persona_fn: Optional[Callable[[str], None]] = None,
+        quiet_fn: Optional[Callable[[], None]] = None,
+        wake_fn: Optional[Callable[[], None]] = None,
+        language_switch_fn: Optional[Callable[[str], None]] = None,
     ):
-        self._handle_text  = handle_text_fn
-        self._loop         = loop
-        self._tts          = tts_engine
-        self._stt          = stt_engine
-        self._quit_fn      = quit_fn
-        self._get_persona  = get_persona_fn   # returns "jarvis" | "friday"
-        self._set_persona  = set_persona_fn   # callable(persona_str)
-        self._stop_event   = threading.Event()
+        self._handle_text       = handle_text_fn
+        self._loop              = loop
+        self._tts               = tts_engine
+        self._stt               = stt_engine
+        self._quit_fn           = quit_fn
+        self._get_persona       = get_persona_fn        # returns "jarvis" | "friday"
+        self._set_persona       = set_persona_fn        # callable(persona_str)
+        self._quiet_fn          = quiet_fn              # pause background services
+        self._wake_fn           = wake_fn               # trigger activation sound + HUD
+        self._language_switch_fn = language_switch_fn   # full switch: TTS + STT + Brain
+        self._stop_event        = threading.Event()
         self._thread: Optional[threading.Thread] = None
 
     def start(self) -> None:
@@ -132,6 +138,22 @@ class TerminalInputThread:
             self._stop_event.set()
             return True
 
+        if lower in ("/quiet", "/pause_monitor", "/shh"):
+            if self._quiet_fn:
+                try:
+                    self._quiet_fn()
+                except Exception as e:
+                    logger.error("[Terminal] Quiet callback error: %s", e)
+            return True
+
+        if lower in ("/wake", "/activate"):
+            if self._wake_fn:
+                try:
+                    self._wake_fn()
+                except Exception as e:
+                    logger.error("[Terminal] Wake callback error: %s", e)
+            return True
+
         print(f"[JARVIS] Unknown command: {cmd}", flush=True)
         return True
 
@@ -147,12 +169,12 @@ class TerminalInputThread:
             logger.error("[Terminal] Persona switch error: %s", e)
 
     def _switch_language(self, lang: str) -> None:
-        if self._tts is None and self._stt is None:
-            print(f"[JARVIS] Language engines not connected", flush=True)
-            return
         try:
-            from brain.language_switch import handle_language_switch
-            handle_language_switch(lang, self._tts, self._stt)
+            if self._language_switch_fn is not None:
+                self._language_switch_fn(lang)
+            else:
+                from brain.language_switch import handle_language_switch
+                handle_language_switch(lang, self._tts, self._stt)
             print(f"[JARVIS] Language switched to {lang.upper()}", flush=True)
         except Exception as e:
             logger.error("[Terminal] Language switch error: %s", e)

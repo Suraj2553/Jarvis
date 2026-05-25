@@ -300,7 +300,6 @@ class LLMRouter:
         if not key:
             return None
         if not self.groq_healthy:
-            print("[LLMRouter] Groq → skipped (rate-limited, retry pending).")
             return None
         if not self.internet_available():
             return None
@@ -429,7 +428,6 @@ class LLMRouter:
         if not key:
             return None
         if not self.gemini_healthy:
-            print("[LLMRouter] Gemini → skipped (rate-limited, retry pending).")
             return None
         if not self.internet_available():
             return None
@@ -440,8 +438,9 @@ class LLMRouter:
         except Exception as exc:
             status = _http_status(exc)
             if status == 429:
-                print("[LLMRouter] Gemini rate-limited (429) — retrying in 15s.")
                 with self._lock:
+                    if self.gemini_healthy:
+                        print("[LLMRouter] Gemini rate-limited — switching to fallback.")
                     self.gemini_healthy = False
                 self._schedule_retry("gemini", delay=15)
             elif status == 401:
@@ -449,8 +448,9 @@ class LLMRouter:
                 with self._lock:
                     self.gemini_healthy = False
             else:
-                print(f"[LLMRouter] Gemini failed ({type(exc).__name__}): {exc}")
                 with self._lock:
+                    if self.gemini_healthy:
+                        print(f"[LLMRouter] Gemini failed ({type(exc).__name__}): {exc}")
                     self.gemini_healthy = False
                 self._schedule_retry("gemini")
             return None
@@ -489,7 +489,6 @@ class LLMRouter:
         if not key:
             return None
         if not self.nvidia_healthy:
-            print("[LLMRouter] NVIDIA → skipped (rate-limited, retry pending).")
             return None
         if not self.internet_available():
             return None
@@ -544,7 +543,6 @@ class LLMRouter:
         if not key:
             return None
         if not self.openrouter_healthy:
-            print("[LLMRouter] OpenRouter → skipped (rate-limited, retry pending).")
             return None
         if not self.internet_available():
             return None
