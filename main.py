@@ -600,6 +600,21 @@ def _ensure_model(host: str, model: str, groq_key: str = "") -> None:
 #  Settings dialog (existing, kept intact)                             #
 # ──────────────────────────────────────────────────────────────────── #
 
+class _StableCombo(QComboBox):
+    """QComboBox that activates its parent window before opening the popup.
+
+    On Windows, if the dialog doesn't own foreground focus (e.g. opened
+    from the system tray), the first click goes to activating the window
+    rather than the combo box, causing the popup to close immediately.
+    Forcing activateWindow() before showPopup() prevents this.
+    """
+    def showPopup(self):
+        win = self.window()
+        win.activateWindow()
+        win.raise_()
+        super().showPopup()
+
+
 class SettingsDialog(QDialog):
     _GROQ_MODELS = [
         "llama-3.3-70b-versatile",
@@ -615,7 +630,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self._cfg = config
         self.setWindowTitle("JARVIS Settings")
-        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        self.setWindowFlags(Qt.WindowType.Dialog)
         self.setFixedSize(480, 540)
         self.setStyleSheet("""
             QDialog   { background: #0A0A1E; color: #F0F0F0; }
@@ -632,6 +647,30 @@ class SettingsDialog(QDialog):
             QPushButton#cancel { background: #2A2A4A; color: #F0F0F0; }
         """)
         self._build_ui(ollama_models or [], sapi_voices or [])
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        QTimer.singleShot(50, self._claim_foreground)
+
+    def _claim_foreground(self):
+        self.activateWindow()
+        self.raise_()
+        try:
+            import ctypes
+            user32  = ctypes.windll.user32
+            kernel32 = ctypes.windll.kernel32
+            hwnd    = int(self.winId())
+            fg_hwnd = user32.GetForegroundWindow()
+            fg_tid  = user32.GetWindowThreadProcessId(fg_hwnd, None)
+            my_tid  = kernel32.GetCurrentThreadId()
+            if fg_tid and fg_tid != my_tid:
+                user32.AttachThreadInput(fg_tid, my_tid, True)
+                user32.SetForegroundWindow(hwnd)
+                user32.AttachThreadInput(fg_tid, my_tid, False)
+            else:
+                user32.SetForegroundWindow(hwnd)
+        except Exception:
+            pass
 
     def _row(self, label, widget):
         row = QHBoxLayout()
@@ -663,7 +702,7 @@ class SettingsDialog(QDialog):
         self._rate_slider.setValue(self._cfg.get("voice_rate", 165))
         vbox.addLayout(self._row("Voice speed:", self._rate_slider))
 
-        self._voice_combo = QComboBox()
+        self._voice_combo = _StableCombo()
         if sapi_voices:
             self._voice_combo.addItems(sapi_voices)
             idx = self._voice_combo.findText(self._cfg.get("tts_voice", ""))
@@ -681,7 +720,7 @@ class SettingsDialog(QDialog):
         self._groq_edit.setText(self._cfg.get("groq_api_key", ""))
         vbox.addLayout(self._row("Groq API key:", self._groq_edit))
 
-        self._model_combo = QComboBox()
+        self._model_combo = _StableCombo()
         cur_model = self._cfg.get("model", "llama-3.3-70b-versatile")
         all_models = [f"[Groq] {m}" for m in self._GROQ_MODELS]
         if ollama_models:
@@ -695,7 +734,7 @@ class SettingsDialog(QDialog):
                 break
         vbox.addLayout(self._row("AI model:", self._model_combo))
 
-        self._stt_combo = QComboBox()
+        self._stt_combo = _StableCombo()
         _STT_OPTIONS = [
             "tiny.en (~40 MB, fastest)",
             "base.en (~150 MB, balanced)",
@@ -1914,7 +1953,7 @@ class JARVIS:
         threading.Thread(target=_fetch, daemon=True, name="SettingsFetch").start()
 
     def _open_settings_dialog(self, ollama_models: list, sapi_voices: list) -> None:
-        dlg = SettingsDialog(self._cfg, None, ollama_models, sapi_voices)
+        dlg = SettingsDialog(self._cfg, self._hud, ollama_models, sapi_voices)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self._cfg = cfg_mod.load_config()
             if self._tts_engine:

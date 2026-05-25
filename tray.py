@@ -56,7 +56,7 @@ class SystemTray:
 
     def start(self) -> None:
         menu = Menu(
-            MenuItem("Show NOVA",  lambda *_: self._show()),
+            MenuItem("Show JARVIS", lambda *_: self._show()),
             MenuItem("Hide",       lambda *_: self._hide()),
             MenuItem("Settings",   lambda *_: self._settings()),
             Menu.SEPARATOR,
