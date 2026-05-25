@@ -51,11 +51,11 @@ class ObservationLedger:
         "late_evening":  3600,   # 1 h
         "morning":       86400,  # 24 h — once per day
         "battery":       1800,   # 30 min
-        "cpu":           600,    # 10 min
-        "ram":           600,    # 10 min
+        "cpu":           1800,   # 30 min
+        "ram":           1800,   # 30 min
         "session":       3600,   # 1 h
-        "idle":          300,    # 5 min (ambient filler)
-        "generic":       1500,   # 25 min
+        "idle":          1800,   # 30 min
+        "generic":       1800,   # 30 min
     }
 
     _instance: "Optional[ObservationLedger]" = None
@@ -152,8 +152,8 @@ _OBSERVERS = [_obs_cpu, _obs_ram, _obs_battery, _obs_time, _obs_session, _obs_id
 
 class SystemMonitor:
     _ALERT_COOLDOWN  = 300     # seconds between same-type proactive alerts
-    _AMBIENT_MIN_S   = 120     # increased from 90 — less chatty
-    _AMBIENT_MAX_S   = 240     # increased from 180
+    _AMBIENT_MIN_S   = 1500    # 25 min
+    _AMBIENT_MAX_S   = 2100    # 35 min
 
     # Windows system processes that look like spikes but are not user processes
     _SYSTEM_PROC_NAMES = frozenset({

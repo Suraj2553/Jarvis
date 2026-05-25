@@ -1614,6 +1614,16 @@ class JARVIS:
                     self._signals.hide_win.emit()
                     return
 
+                # ── Persona switch via voice ───────────────────── #
+                if any(w in tl for w in ("switch to friday", "activate friday",
+                                         "hey friday", "friday mode")):
+                    self._on_toggle_persona_by_name("friday")
+                    return
+                if any(w in tl for w in ("switch to jarvis", "activate jarvis",
+                                         "jarvis mode", "back to jarvis")):
+                    self._on_toggle_persona_by_name("jarvis")
+                    return
+
                 # ── Interview: skip / next question ───────────── #
                 import tools.meeting as _mt_iv
                 if _mt_iv._interview_active and any(

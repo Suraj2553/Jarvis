@@ -15,6 +15,11 @@ env/
 
 # JARVIS runtime files
 crash_trace.txt
+frames_final/
+automation/
+*.mp4
+*.mkv
+*.avi
 jarvis.log
 jarvis_err.log
 *.log
