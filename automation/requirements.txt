@@ -1,0 +1,6 @@
+edge-tts
+pyttsx3
+obsws-python
+pygetwindow
+pyautogui
+
